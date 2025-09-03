@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+/.idea/copilotDiffState.xml
+/.idea/compiler.xml
+/.idea/jsLibraryMappings.xml
