@@ -21,18 +21,27 @@ Prerequisites:
 - Docker Desktop or Docker Engine with Compose plugin
 - No local Node/Yarn required for Compose dev; dependencies install inside the container
 
-### Development (with HMR)
+### Development (with HMR + Postgres)
 
-Run a single dev container with hot reload:
+Run the app and database with hot reload:
 
 ```bash
 docker compose up
 ```
 
 - App: http://localhost:3000
+- Postgres: localhost:5432 (user: postgres, password: postgres, db: postgres)
 - Source is bind-mounted; edits on the host will hot-reload.
-- File watching is enabled in containers via `WATCHPACK_POLLING=true` and `CHOKIDAR_USEPOLLING=1`.
-- The container runs `yarn install` and `yarn dev -H 0.0.0.0` inside Node 22 Alpine.
+- File watching is enabled via `WATCHPACK_POLLING=true` and `CHOKIDAR_USEPOLLING=1`.
+- The app container runs `yarn install`, `npx prisma generate`, and `yarn dev -H 0.0.0.0`.
+
+Quick test: visit `http://localhost:3000/api/users` to see an empty list by default (`{"users": []}`).
+
+First-time schema (if you add models in `prisma/schema.prisma`):
+
+```bash
+docker compose exec app yarn db:push
+```
 
 Useful commands:
 
@@ -46,11 +55,14 @@ docker compose logs -f app
 # Stop containers
 docker compose down
 
-# Stop and remove volumes (clears node_modules/.next in the container)
+# Stop and remove volumes (clears node_modules/.next and db data)
 docker compose down -v
 
 # Rebuild after changing dependencies or Docker settings
 docker compose up --build
+
+# Open a psql shell
+docker compose exec -T db psql -U postgres -d postgres -c "\dt"
 ```
 
 Environment and volumes (from docker-compose.yml):
@@ -58,33 +70,53 @@ Environment and volumes (from docker-compose.yml):
 - Environment
   - `NODE_ENV=development`
   - `NEXT_TELEMETRY_DISABLED=1`
-  - `WATCHPACK_POLLING=true`, `CHOKIDAR_USEPOLLING=1` for reliable HMR in containers
+  - `WATCHPACK_POLLING=true`, `CHOKIDAR_USEPOLLING=1`
+  - `DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres?schema=public`
 - Volumes
   - `.:/app` bind mount for your source
-  - Anonymous volumes for `/app/node_modules` and `/app/.next` so container installs don’t conflict with the host
+  - Anonymous volumes for `/app/node_modules` and `/app/.next`
+  - Named volume `db-data` for Postgres persistence
 
-If you hit dependency issues or want a clean slate:
+### Prisma
+
+Common commands (run inside the app container):
 
 ```bash
-docker compose down -v && docker compose up --build
+# Generate Prisma Client (runs automatically on install)
+docker compose exec app yarn prisma generate
+
+# Push schema to the DB (development)
+docker compose exec app yarn db:push
+
+# Create a migration (development)
+docker compose exec app yarn db:migrate
+
+# Open Prisma Studio (note: may require exposing port 5555)
+docker compose exec app yarn db:studio
 ```
 
-### Production (no Compose)
+Schema location: `prisma/schema.prisma`.
+Prisma Client helper: `src/lib/prisma.ts`.
 
-Build and run the optimized image directly with the Dockerfile:
+### Production (Dockerfile)
+
+Build and run the optimized image:
 
 ```bash
 # Build the image
 docker build -t nextjs-prisma-app:latest .
 
-# Run the container on port 3000
-docker run --rm -p 3000:3000 --name nextjs-prisma-web nextjs-prisma-app:latest
-
-# (Optional) Run on a different port
-docker run --rm -e PORT=8080 -p 8080:8080 --name nextjs-prisma-web nextjs-prisma-app:latest
+# Run with a production database URL
+docker run --rm \
+  -e DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DB?schema=public" \
+  -e PORT=3000 -p 3000:3000 \
+  --name nextjs-prisma-web \
+  nextjs-prisma-app:latest
 ```
 
-The production image uses Next.js standalone output for a small runtime and starts with `node server.js`. `PORT` defaults to 3000.
+Notes:
+- The image uses Next.js standalone output and includes Prisma engines.
+- `DATABASE_URL` must point to your production database.
 
 ## Learn More
 
@@ -103,11 +135,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Troubleshooting
 
-- Port already in use: change the published port (e.g., `-p 3001:3000` or edit `docker-compose.yml`).
+- Port already in use: change the published port (e.g., `-p 3001:3000`) or adjust `docker-compose.yml`.
 - Stale dependencies or build cache: `docker compose down -v && docker compose up --build`.
-- HMR not triggering: ensure you’re editing files under the bind-mounted directory and that polling env vars are set (they are by default in Compose).
-- Permission issues on Linux: the dev container runs as root; production image runs as an unprivileged user (`nextjs`).
-
-## Notes on Prisma / Database
-
-This template doesn’t include a database or Prisma setup yet. If you add Prisma later, create a DB service in `docker-compose.yml` (e.g., Postgres), add `depends_on` for the app, and configure your `DATABASE_URL` environment variable. See Prisma’s docs for details: https://www.prisma.io/docs
+- HMR not triggering: ensure you’re editing files under the bind-mounted directory.
+- DB connection errors: confirm `db` is healthy (`docker compose ps`), and `DATABASE_URL` points to `db:5432` in Compose or a reachable host in production.
+- Permission issues on Linux: dev container runs as root; production image runs as unprivileged user (`nextjs`).
