@@ -25,7 +25,7 @@ function SubmitButton() {
 
 export default function AddUserForm({ formAction, formState }: Props) {
   return (
-    <div className="mb-8 rounded-lg border bg-gray-50 p-4">
+    <div className="mb-8 rounded-lg border p-4">
       <h2 className="mb-4 text-lg font-medium">Add New User</h2>
       <form action={formAction} className="space-y-4">
         <div>

@@ -100,4 +100,4 @@ yarn db:studio
 
 ## License
 
-- MIT
+- GNU GENERAL PUBLIC LICENSE 2

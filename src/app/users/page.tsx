@@ -1,26 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { z } from "zod";
+import { useActionState, useEffect } from "react";
 import { addUser, AddUserState } from "./actions";
 import AddUserForm from "./AddUserForm";
-
-const UserSchema = z.object({
-  id: z.number(),
-  email: z.email(),
-  name: z.string().nullable().optional(),
-  createdAt: z.string(),
-});
-
-const UsersResponse = z.object({ users: z.array(UserSchema) });
-
-type User = z.infer<typeof UserSchema>;
-
-type State = {
-  users?: User[];
-  loading: boolean;
-  error?: string;
-};
+import { useUsers } from "@/hooks/useUsers";
+import { useQueryClient } from "@tanstack/react-query";
 
 const initialState: AddUserState = {
   success: false,
@@ -28,45 +12,22 @@ const initialState: AddUserState = {
 };
 
 export default function UsersPage() {
-  const [state, setState] = useState<State>({
-    users: undefined,
-    loading: true,
-  });
+  const { data: users, isLoading, isError, error } = useUsers();
 
-  // Explicitly type the useActionState hook
+  const queryClient = useQueryClient();
+
   const [formState, formAction] = useActionState<AddUserState, FormData>(
     addUser,
     initialState,
   );
 
-  const loadData = async () => {
-    try {
-      const res = await fetch("/api/users", { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const parsed = UsersResponse.safeParse(json);
-      if (!parsed.success) {
-        throw new Error("Invalid response shape");
-      }
-      setState({ users: parsed.data.users, loading: false });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setState({
-        users: undefined,
-        loading: false,
-        error: err?.message ?? "Failed to load",
-      });
-    }
-  };
-
-  // Load users when form submission is successful
   useEffect(() => {
     if (formState.success) {
-      loadData();
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
     }
-  }, [formState.success]);
+  }, [formState.success, queryClient]);
 
-  if (state.loading) {
+  if (isLoading) {
     return (
       <div className="grid min-h-screen place-items-center p-8 sm:p-20">
         <p className="text-sm text-gray-500">Loading…</p>
@@ -74,10 +35,12 @@ export default function UsersPage() {
     );
   }
 
-  if (state.error) {
+  if (isError) {
     return (
       <div className="grid min-h-screen place-items-center p-8 sm:p-20">
-        <p className="text-sm text-red-600">Error: {state.error}</p>
+        <p className="text-sm text-red-600">
+          Error: {(error as Error)?.message}
+        </p>
       </div>
     );
   }
@@ -88,14 +51,10 @@ export default function UsersPage() {
 
       <AddUserForm formAction={formAction} formState={formState} />
 
-      {state.loading ? (
-        <p>Loading users...</p>
-      ) : state.error ? (
-        <p className="text-red-500">Error: {state.error}</p>
-      ) : state.users && state.users.length > 0 ? (
+      {users && users.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="min-w-full table-auto border-collapse">
-            <thead className="bg-gray-100">
+            <thead className="">
               <tr>
                 <th className="border p-2 text-left">ID</th>
                 <th className="border p-2 text-left">Email</th>
@@ -104,7 +63,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {state.users.map((user) => (
+              {users.map((user) => (
                 <tr key={user.id}>
                   <td className="border p-2">{user.id}</td>
                   <td className="border p-2">{user.email}</td>
