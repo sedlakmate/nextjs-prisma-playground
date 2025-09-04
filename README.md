@@ -1,142 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# nextjs-prisma-docker-compose
 
-## Getting Started
+Minimal Next.js + Prisma starter (created with create-next-app).
 
-First, run the development server:
+This repository can be developed either with a local Node/Yarn environment or using Docker Compose (recommended for an identical dev environment). The instructions below show both options.
 
-```bash
-yarn dev
-```
+## Prerequisites
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- If using Docker Compose: Docker Desktop or Docker Engine with the Compose plugin.
+- If not using Docker: Node 22+ and Yarn (project uses yarn@1.x).
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+## Quick start — recommended (Docker Compose)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Start app + Postgres with hot reload:
 
-## Docker
+   ```bash
+   docker compose up
+   ```
 
-Prerequisites:
+2. Open the app: [http://localhost:3000](http://localhost:3000)  
+   Postgres: localhost:5432 (user: postgres, password: postgres, db: postgres)
 
-- Docker Desktop or Docker Engine with Compose plugin
-- No local Node/Yarn required for Compose dev; dependencies install inside the container
+3. Common container commands:
 
-### Development (with HMR + Postgres)
+   ```bash
+   # Start in background
+   docker compose up -d
 
-Run the app and database with hot reload:
+   # Tail app logs
+   docker compose logs -f app
 
-```bash
-docker compose up
-```
+   # Stop and remove containers
+   docker compose down
 
-- App: http://localhost:3000
-- Postgres: localhost:5432 (user: postgres, password: postgres, db: postgres)
-- Source is bind-mounted; edits on the host will hot-reload.
-- File watching is enabled via `WATCHPACK_POLLING=true` and `CHOKIDAR_USEPOLLING=1`.
-- The app container runs `yarn install`, `npx prisma generate`, and `yarn dev -H 0.0.0.0`.
+   # Stop and remove volumes (clears node_modules/.next and DB data)
+   docker compose down -v
+   ```
 
-Quick test: visit `http://localhost:3000/api/users` to see an empty list by default (`{"users": []}`).
+## Local dev (no Docker)
 
-First-time schema (if you add models in `prisma/schema.prisma`):
+1. Install deps:
 
-```bash
-docker compose exec app yarn db:push
-```
+   ```bash
+   yarn install
+   ```
 
-Useful commands:
+2. Start dev server:
 
-```bash
-# Start in background
-docker compose up -d
+   ```bash
+   yarn dev
+   ```
 
-# Tail logs
-docker compose logs -f app
+3. Open [http://localhost:3000](http://localhost:3000)
 
-# Stop containers
-docker compose down
+## Prisma
 
-# Stop and remove volumes (clears node_modules/.next and db data)
-docker compose down -v
+- Schema: `prisma/schema.prisma`
+- Prisma helper: `src/lib/prisma.ts`
 
-# Rebuild after changing dependencies or Docker settings
-docker compose up --build
-
-# Open a psql shell
-docker compose exec -T db psql -U postgres -d postgres -c "\dt"
-```
-
-Environment and volumes (from docker-compose.yml):
-
-- Environment
-  - `NODE_ENV=development`
-  - `NEXT_TELEMETRY_DISABLED=1`
-  - `WATCHPACK_POLLING=true`, `CHOKIDAR_USEPOLLING=1`
-  - `DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres?schema=public`
-- Volumes
-  - `.:/app` bind mount for your source
-  - Anonymous volumes for `/app/node_modules` and `/app/.next`
-  - Named volume `db-data` for Postgres persistence
-
-### Prisma
-
-Common commands (run inside the app container):
+Useful Prisma commands (run in the app container or locally):
 
 ```bash
-# Generate Prisma Client (runs automatically on install)
 docker compose exec app yarn prisma generate
-
-# Push schema to the DB (development)
 docker compose exec app yarn db:push
-
-# Create a migration (development)
 docker compose exec app yarn db:migrate
-
-# Open Prisma Studio (note: may require exposing port 5555)
 docker compose exec app yarn db:studio
 ```
 
-Schema location: `prisma/schema.prisma`.
-Prisma Client helper: `src/lib/prisma.ts`.
-
-### Production (Dockerfile)
-
-Build and run the optimized image:
+or locally (if you have Node/Yarn installed):
 
 ```bash
-# Build the image
-docker build -t nextjs-prisma-app:latest .
-
-# Run with a production database URL
-docker run --rm \
-  -e DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DB?schema=public" \
-  -e PORT=3000 -p 3000:3000 \
-  --name nextjs-prisma-web \
-  nextjs-prisma-app:latest
+yarn prisma generate
+yarn db:push
+yarn db:migrate
+yarn db:studio
 ```
 
-Notes:
-- The image uses Next.js standalone output and includes Prisma engines.
-- `DATABASE_URL` must point to your production database.
+## Scripts
 
-## Learn More
+- `yarn dev` — development server
+- `yarn build` — production build
+- `yarn start` — start built app
+- `yarn types` — TypeScript typecheck (tsc --noEmit)
+- `yarn lint` — run ESLint
+- `yarn db:push` / `db:migrate` / `db:studio` — Prisma commands
 
-To learn more about Next.js, take a look at the following resources:
+## Notes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The Docker Compose workflow binds the project into the container and runs install/generate steps automatically, providing a consistent dev environment.
+- You may choose to develop locally without Docker; Docker Compose is suggested if you want parity with the containerized environment.
 
 ## Troubleshooting
 
-- Port already in use: change the published port (e.g., `-p 3001:3000`) or adjust `docker-compose.yml`.
-- Stale dependencies or build cache: `docker compose down -v && docker compose up --build`.
-- HMR not triggering: ensure you’re editing files under the bind-mounted directory.
-- DB connection errors: confirm `db` is healthy (`docker compose ps`), and `DATABASE_URL` points to `db:5432` in Compose or a reachable host in production.
-- Permission issues on Linux: dev container runs as root; production image runs as unprivileged user (`nextjs`).
+- If a port is in use, change the published port or stop the process using it.
+- To clear caches and volumes prior to rebuild:
+
+  ```bash
+  docker compose down -v && docker compose up --build
+  ```
+
+## License
+
+- MIT
