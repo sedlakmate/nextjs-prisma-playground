@@ -13,6 +13,7 @@ RUN apk add --no-cache libc6-compat openssl
 
 # Install dependencies
 COPY package.json yarn.lock ./
+COPY prisma ./prisma/
 # Disable telemetry in CI/containers
 ENV NEXT_TELEMETRY_DISABLED=1
 # Install all deps (dev deps are required for build)

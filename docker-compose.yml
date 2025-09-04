@@ -2,18 +2,18 @@ version: "3.9"
 
 services:
   app:
-    image: node:22-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
     working_dir: /app
-    user: root
-    command: sh -c "apk add --no-cache openssl && corepack enable && yarn install --frozen-lockfile && npx prisma generate && npx prisma db push && yarn dev -H 0.0.0.0"
+    command: sh -c "npx prisma generate && npx prisma db push && yarn dev -H 0.0.0.0"
     ports:
       - "3000:3000"
+    env_file:
+      - ./.env.local
     environment:
-      - NODE_ENV=development
-      - NEXT_TELEMETRY_DISABLED=1
-      - WATCHPACK_POLLING=true
-      - CHOKIDAR_USEPOLLING=1
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres?schema=public
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/postgres?schema=public"
     volumes:
       - .:/app
       # Keep container-managed node_modules separate from host
